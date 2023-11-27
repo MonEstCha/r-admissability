@@ -143,11 +143,13 @@ descVec getUnionOfVecs(descVec v1, descVec v2){
 /*
  * Function calculates the probability of taking a new solution even if it is worse that the current one
  */
-float getProb(int t,int wcolOld, int wcolNew, int n /* float rightAvg, float leftAvg, int il*/){
-	//float ratio = (float) ((rightAvg-leftAvg) * (il + 1)) / (float) t;
-	float wcolRatio = (float)(1 - wcolNew + wcolOld)*0.01;
+float getProb(int t,int wcolOld, int wcolNew, int n ){
+	float wcolRatio = (float)(1 - (wcolNew - wcolOld)*0.01);
 	float tempRatio = (0.5*n + (float) t) / (float) n;
-	return exp(- tempRatio);
+	return exp(- tempRatio) * wcolRatio;
+	/*float wcolRatio = (float)(wcolNew - wcolOld)*6;
+	float tempRatio = 1.0 / (float) swapLim;
+	return exp(- wcolRatio * tempRatio);*/
 }
 
 /*************************** Functions adapted from Nadara et al. (2019) **************************/
@@ -632,22 +634,22 @@ int main(int argc, char** argv) {
 
 	trace << "#t,il,wcol,swaps,rdVal,prob" << endl;
 	trace << 1 << ",," << wcol << ",0,,0"<< endl;
-	float swapLim_init = (float) n / (float) 3;
+	float swapLim_init = (float) n / (float) 10;
 	int schedule_Start = 1;
 	int schedule_End = 0.65*n;
 
 	int ilLast = 0, tLast = 0;
 	float slope = 0.002;
 	int compCt = 0;
-	int maxComputations = n * 100;
+	int maxComputations = n * 90;
 
 	while(compCt < maxComputations && schedule_Start < schedule_End){ // computation loop
 		for(int t = schedule_Start; t < schedule_End; t++){ // schedule loop
 			// temperature: how often to swap in relation to iterations
 			//float slope = (float) t / (float) n;
 			int swapLim = max(1, (int) (swapLim_init * exp(-slope*t)));
-			if(t < 10)
-				cout << "swapLim: " << swapLim << endl;
+			/*if(t < 10)
+				cout << "swapLim: " << swapLim << endl;*/
 			// if lots of trials were needed it is probably better to allow more swaps
 			//swapLim += ilLast*2;
 			// trials to find a suitable neighbor
@@ -692,12 +694,11 @@ int main(int argc, char** argv) {
 
 				wcolInc = wcolNew >= wcol;
 				float prob = getProb(t,wcol, wcolNew, n /*rightAvg, leftAvg, il*/);
-				if(t < 10)
-					cout << "rdVal: " << rdVal << "prob: " << prob << endl;
+
 				if(wcolInc && prob < rdVal){
 
 					//cout << "changes not applied" << endl;
-					trace << "#" <<t << "," << il << "," << wcolNew << "," << swapLim << ",," << endl;
+					trace << "#" <<t << "," << il << "," << wcolNew << "," << swapLim << ",," << rdVal << "," << prob << endl;
 				}
 				else{
 					// found better solution or accepting worse one
@@ -720,11 +721,14 @@ int main(int argc, char** argv) {
 			if(ilLast + 1 >= n/50 + t){
 				cout << "heat up -- compCt: " << compCt << ", wcol: " << wcol << endl;
 				trace << "###heat up" << endl;
-				schedule_Start += (t - schedule_Start);
+				schedule_Start += (t - schedule_Start)*0.3;
 				break; // schedule loop
 			}
 			tLast = t;
 		} // end schedule loop
+		if(schedule_Start == 1){
+			break;
+		}
 		compCt += tLast;
 	} // end computation loop
 	trace.close();
