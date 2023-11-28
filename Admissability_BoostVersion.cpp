@@ -51,8 +51,6 @@ int execDFS(typename graph_traits< Graph >::vertex_descriptor u, const Graph& g,
 	typename graph_traits < Graph >::adjacency_iterator vi, vi_end;
 	for (boost::tie(vi, vi_end) = adjacent_vertices(u, g); vi != vi_end; ++vi){
 		int child = get(name_map, *vi);
-	//auto neighbors = adjacent_vertices(rootN, g);
-	//for(auto child: make_iterator_range(neighbors)){
 		// heuristical behavior: just take the first non-visited one
 		if(visited[child] == 0){
 			if(putToOrder[child] == 0){
@@ -96,7 +94,6 @@ int approxAdmOnWholeGraph(typename graph_traits< Graph >::vertex_descriptor u, c
 		}
 		// make sure vertex is not visited again in case it was released
 		visited[i] = 1;
-		//cout << "v: " << v << ", nei: " << nei << endl;
 	}
 
 	return approx_rAdmiss;
@@ -121,7 +118,6 @@ int count_adj_vertices(typename graph_traits< Graph >::vertex_descriptor u, cons
 	int ct = 0;
     typename graph_traits< Graph >::adjacency_iterator vi, vi_end;
     for (boost::tie(vi, vi_end) = adjacent_vertices(u, g); vi != vi_end; ++vi){
-    	//cout << "in line 121 "<< ct << endl;
     	if(putToOrder[get(name_map, *vi)] == 0)
     		ct++;
     }
@@ -180,7 +176,6 @@ int main(int argc, char** argv)
 	string graph_file, output_file, file_format;
 	int R;
 	try {
-		//std::cout << 'l43' << std::endl;
 		FlagParser flag_parser;
 		flag_parser.ParseFlags(argc, argv);
 		graph_file = flag_parser.GetFlag("in", true);
@@ -230,7 +225,6 @@ int main(int argc, char** argv)
 
 	typename property_traits< property_map < UndirectedGraph, vertex_name_t >::type >::value_type name;
 
-	//vector<vector<int>> orig_graph = reader.ReadGraph(graph_file, file_format);
 	pair<int,vector<pair<string, string>>> res = reader.ReadGraphEdges(graph_file, file_format);
 	n = res.st - 1;
 	vector<typename graph_traits < UndirectedGraph >::vertex_descriptor> vD;
@@ -241,34 +235,13 @@ int main(int argc, char** argv)
 		name = v;
 		put(name_map, u, name);
 		vD.push_back(u);
-		//cout << get(name_map, u) << endl;
 	}
 	// add edges
 
 	for(auto e: res.second){
-		//cout << reader.shrink_indices[e.first] << reader.shrink_indices[e.second] << endl;
-		/*typename graph_traits < UndirectedGraph >::vertex_descriptor start, endD;
-		graph_traits< UndirectedGraph >::vertex_iterator i, end;
-		for(tie(i, end) = vertices(g); i != end; ++i){
-			int iName = get(name_map, *i);
-			if(iName == reader.shrink_indices[e.first]){
-				start = *i;
-			}
-			if(iName == reader.shrink_indices[e.second]){
-				endD = *i;
-			}
-		}
-		add_edge(start, endD, g);*/
 		add_edge(vD[reader.shrink_indices[e.first]], vD[reader.shrink_indices[e.second]], g);
 	}
 	cout << "edges added " << endl;
-
-	cout << "vertices" << endl;
-	/*pair<UndirectedGraph::vertex_iterator, UndirectedGraph::vertex_iterator> vs = vertices(g);
-	copy(vs.first, vs.second, ostream_iterator<UndirectedGraph::vertex_descriptor>{cout, "\n"});*/
-
-	/*pair<UndirectedGraph::edge_iterator, UndirectedGraph::edge_iterator> es = edges(g);
-	copy(es.first, es.second, std::ostream_iterator<UndirectedGraph::edge_descriptor>{cout, "\n"});*/
 
 	int putToOrder[n+1];
 	for(int v=0; v<n+1; v++){
@@ -286,7 +259,6 @@ int main(int argc, char** argv)
 			}
 			int v = get(name_map, *i);
 			if(putToOrder[v] == 0){
-				//output_adjacent_vertices(cout, *i, g, get(vertex_name, g));
 				adm = approxAdmOnWholeGraph(*i, g, get(vertex_name, g), putToOrder, n, R);
 				if(minAdmiss > adm){
 					minAdmiss = adm;
@@ -300,7 +272,6 @@ int main(int argc, char** argv)
 		}
 		order.push_back(minAdmissV);
 		putToOrder[minAdmissV] = 1;
-		//cout << "minAdmiss: " << minAdmiss << " minAdmissV: " << minAdmissV << endl;
 
 	}
 
