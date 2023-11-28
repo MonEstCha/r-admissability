@@ -635,7 +635,7 @@ int main(int argc, char** argv) {
 	trace << "#t,il,wcol,swaps,rdVal,prob" << endl;
 	trace << 1 << ",," << wcol << ",0,,0"<< endl;
 	float swapLim_init = (float) n / (float) 10;
-	int schedule_Start = 0.05*n;
+	int schedule_Start = 0.3*n;
 	int schedule_End = 0.6*n;
 
 	int ilLast = 0, tLast = 0;
@@ -691,12 +691,13 @@ int main(int argc, char** argv) {
 				wcolInc = wcolNew >= wcol;
 				float prob = getProb(t,wcol, wcolNew, n /*rightAvg, leftAvg, il*/);
 
-				if(wcolInc && prob < rdVal){
+				/*if(wcolInc && prob < rdVal){
 
 					//cout << "changes not applied" << endl;
 					trace << "#" <<t << "," << il << "," << wcolNew << "," << swapLim << ",," << rdVal << "," << prob << endl;
 				}
-				else{
+				else{*/
+				if(!wcolInc || prob >= rdVal){
 					// found better solution or accepting worse one
 					// update wcol and data structures
 					wcol = wcolNew;
