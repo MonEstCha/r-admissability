@@ -36,7 +36,7 @@ bool hasEnding (std::string const &fullString, std::string const &ending) {
 }
 
 void Err() {
-  cerr<<"Usage: ./Degeneracy --in=graph.txtg --rad=radius [--o=output.txt]"<<endl;
+  cerr<<"Usage: ./Admissability_BoostVersion --in=graph.txtg --rad=radius [--o=output.txt]"<<endl;
   cerr<<"--h for help\n";
   exit(1);
 }
@@ -171,7 +171,7 @@ int main(int argc, char** argv)
 	/************************************ Read in flags and check input ************************************/
 
 	if (argc == 2 && string(argv[1]) == "--h") {
-	  cerr<<"Usage: ./Degeneracy --in=graph.txtg --rad=radius [--o=output.txt]"<<endl;
+	  cerr<<"Usage: ./Admissability_BoostVersion --in=graph.txtg --rad=radius [--o=output.txt]"<<endl;
 	  cerr<<"rad - for rad=1 it computes typical degeneracy,"<<endl;
 	  cerr<<"      for rad>1 it computes degeneracy on an auxiliary graph where"<<endl;
 	  cerr<<"      two vertices are connected if their distance in original graph was <=R"<<endl;
