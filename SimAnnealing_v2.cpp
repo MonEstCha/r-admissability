@@ -108,7 +108,7 @@ void printVec(const Graph& g, descVec vec, typename graph_traits< Graph >::verte
 	cout << desc << " of " << get(name_map, root) << ": {";
 	for (typename graph_traits<Graph>::vertex_descriptor vD : vec) {
 		int v = get(name_map, vD);
-		cout << v << ", " << endl;
+		cout << v << ", ";
 	}
 	cout << "}" << endl;
 }
@@ -207,7 +207,51 @@ vector<typename graph_traits<Graph>::vertex_descriptor> ComputeSingleCluster(con
 		}
 	}
 	return res;
-}
+} // Function seems to have side effects!!
+
+/**
+ * Function calculates the vertices that contain the root vertex in their potential weakly R-reachable set for a given order
+ * @param where_in_order, the position of the vertices in the order
+ * @param phase_id, the current position to fill in the ordering
+ * @return a vector containing all vertices that have root in their weakly R-reachable set
+ */
+template < typename Graph, typename VertexNameMap >
+vector<typename graph_traits<Graph>::vertex_descriptor> ComputeSingleCluster(const Graph& graph,
+                                 vector<int>& where_in_order,
+                                 int R,
+                                 vector<int>& is_forb,
+                                 typename graph_traits<Graph>::vertex_descriptor u,
+								 VertexNameMap name_map,
+                                 int phase_id) {
+	int root = get(name_map,u);
+	//cout << "root: " <<root  << endl;
+	vector<int> last_vis(num_vertices(graph)+1);
+	vector<int> dis(num_vertices(graph)+1);
+	vector<typename graph_traits<Graph>::vertex_descriptor> res;
+	//if(root == 0) return res;
+	if (!is_forb.empty() && is_forb[root]) { return {}; }
+	last_vis[root] = phase_id;
+	dis[root] = 0;
+	vector<typename graph_traits<Graph>::vertex_descriptor> que{u};
+	// breadth first search up to depth R
+	for (int ii = 0; ii < (int)que.size(); ii++) {
+		typename graph_traits<Graph>::vertex_descriptor cur_vD = que[ii];
+		int cur_v = get(name_map, cur_vD);
+		res.PB(cur_vD);
+		if (dis[cur_v] == R) { continue; }
+		//for (auto nei : graph[cur_v]) {
+		typename graph_traits<Graph>::adjacency_iterator neiD, nei_end;
+		for (tie(neiD, nei_end) = adjacent_vertices(cur_vD, graph); neiD != nei_end; ++neiD){
+			int nei = get(name_map, *neiD);
+			if (last_vis[nei] != phase_id && where_in_order[nei] > where_in_order[root] && (is_forb.empty() || !is_forb[nei])) {
+				last_vis[nei] = phase_id;
+				que.PB(*neiD);
+				dis[nei] = dis[cur_v] + 1;
+			}
+		}
+	}
+	return res;
+} // Function seems to have side effects!!
 
 /**
  * Function calculates all weakly reachable sets for the given graph and order
@@ -248,15 +292,17 @@ vector<int> ComputeWreachSzs(const Graph& graph, vector<int>& where_in_order, in
 	vector<int> last_vis(n + 1, -1);
 	vector<int> dis(n + 1);
 	vector<int> is_forb;
+	int ct = 1;
 	typename graph_traits< Graph >::vertex_iterator root, end;
 	for(tie(root, end) = vertices(graph); root != end; ++root){
 		int rootName = get(name_map, *root);
-		vector<typename graph_traits<Graph>::vertex_descriptor> cluster = ComputeSingleCluster(graph, where_in_order, R, is_forb, last_vis, dis, *root, name_map, rootName);
+		vector<typename graph_traits<Graph>::vertex_descriptor> cluster = ComputeSingleCluster(graph, where_in_order, R, is_forb, last_vis, dis, *root, name_map, ct);
 		for (typename graph_traits<Graph>::vertex_descriptor v : cluster) {
 		  // increase the wcol for all vertices in the cluster of root as they have
 		  // root in their weakly r-reachable set
 			wreach_sz[get(name_map, v)]++;
 		}
+		ct++;
 	}
 	return wreach_sz;
 }
@@ -583,9 +629,9 @@ int main(int argc, char** argv) {
 	int wcol = 0, wcol_test = 0;
 	vector<int> wreach_szs(n+1,0);
 	vector<int> order;
+	descVec maxWcolVertD;
 	vector<int> last_vis(n + 1);
 	vector<int> dis(n + 1);
-	descVec maxWcolVertD;
 	// doesn't contain anything, but expected as param from ComputeSingleCluster
 	vector<int> is_forb_dummy;
 	std::unordered_set<int> forb;
@@ -613,6 +659,7 @@ int main(int argc, char** argv) {
 		// calculate the initial order, which simply is that of the vertex descriptor list
 		// along the way we also calculate the size of the weakly R-reachable sets
 		int count = 1;
+
 		graph_traits< UndirectedGraph >::vertex_iterator i, end;
 		for(tie(i, end) = vertices(g); i != end; ++i){
 			int iName = get(name_map, *i);
@@ -642,7 +689,9 @@ int main(int argc, char** argv) {
 	}
 
 	cout << "initial order done" << endl;
+
 	cout << "wcol at start: " << wcol << endl;
+	cout << "check: wcol = "<< ComputeWcol(ComputeWreachSzs(g, where_in_order, R, name_map)) << endl;
 
 	/******************************* SIMULATED ANNEALING ********************************/
 	/* Try with reheating */
@@ -657,13 +706,13 @@ int main(int argc, char** argv) {
 	trace << "#t,il,wcol,swaps,rdVal,prob" << endl;
 	trace << 1 << ",," << wcol << ",0,,0"<< endl;
 	float swapLim_init = (float) n / (float) 10;
-	int schedule_Start = 0.5*n;
+	int schedule_Start = 0.4*n;
 	int schedule_End = 0.9*n;
 
 	int ilLast = 0, tLast = 0;
 	float slope = 0.002;
-	int compCt = 0;
-	int maxComputations = n * 200;
+	int compCt = 0, df=0;
+	int maxComputations = n * 400;
 
 	while(compCt < maxComputations && schedule_Start < schedule_End){ // computation loop
 		for(int t = schedule_Start; t < schedule_End; t++){ // schedule loop
@@ -673,7 +722,7 @@ int main(int argc, char** argv) {
 			// trials to find a suitable neighbor
 			for(int il=0; il< t; il++){ // trial loop
 				// by mult. with (float) n/ (float) t, rdVal increases for lower temperatures
-				float rdVal = min(0.99, (rand() % 100 + 33.0) * 0.01); //* (float) n/ (float) t;
+				float rdVal = min(0.99, (rand() % 100 + 35.0) * 0.01); //* (float) n/ (float) t;
 				descVec orderD_copy = orderD;
 				vector<descVec> wreachSets_copy = wreachSets;
 				vector<int> where_in_order_copy = where_in_order, wreach_szs_copy = wreach_szs, order_copy = order;
@@ -697,55 +746,72 @@ int main(int argc, char** argv) {
 						right = temp;
 						//cout << "left: " << left << ", right: " << right << endl;
 					}
-					descVec clusterOldLeft = ComputeSingleCluster(g, where_in_order_copy, R, is_forb_dummy, last_vis, dis, orderD_copy[left], name_map, left);
-					descVec clusterOldRight = ComputeSingleCluster(g, where_in_order_copy, R, is_forb_dummy, last_vis, dis, orderD_copy[right], name_map, right);
+					descVec clusterOldLeft = ComputeSingleCluster(g, where_in_order_copy, R, is_forb_dummy, orderD_copy[left], name_map, order_copy[left]);
+					descVec clusterOldRight = ComputeSingleCluster(g, where_in_order_copy, R, is_forb_dummy, orderD_copy[right], name_map, order_copy[right]);
 					// where_in_order has to be adapted alongside swapping
 					swap(orderD_copy[left], orderD_copy[right]);
 					swap(order_copy[left], order_copy[right]);
-					where_in_order_copy[order_copy[right]] = right;
-					where_in_order_copy[order_copy[left]] = left;
+					where_in_order_copy[order_copy[right]] = right+1;
+					where_in_order_copy[order_copy[left]] = left+1;
 					// the clusters of vertices at positions left and right resp. after the swap
-					descVec clusterNewLeft = ComputeSingleCluster(g, where_in_order_copy, R, is_forb_dummy, last_vis, dis, orderD_copy[right], name_map, right);
-					descVec clusterNewRight = ComputeSingleCluster(g, where_in_order_copy, R, is_forb_dummy, last_vis, dis, orderD_copy[left], name_map, left);
-					// the swap may have altered the resp. weakly reachable sets
-					// the new members of the wreach set for the vertex moved to the right correspond to those vertices that go amiss in the new cluster
+					descVec clusterNewLeft = ComputeSingleCluster(g, where_in_order_copy, R, is_forb_dummy, orderD_copy[right], name_map, order_copy[right]);
+					descVec clusterNewRight = ComputeSingleCluster(g, where_in_order_copy, R, is_forb_dummy, orderD_copy[left], name_map, order_copy[left]);
+
 					descVec diffLeft = getDifferenceOfVecs(clusterOldLeft, clusterNewLeft);
 					// the vertex moved to the left loses the vertices that appear in its cluster now
 					descVec diffRight = getDifferenceOfVecs(clusterNewRight, clusterOldRight);
+
 					wreach_szs_copy[order_copy[right]] = wreach_szs_copy[order_copy[right]] + diffLeft.size();
 					// update the weakly reachable sets for the vertices in diffLeft
 					// they lose the vertex moved to the right
-					for(typename graph_traits < UndirectedGraph >::vertex_descriptor u: diffLeft){
-						int memberName = get(name_map, u);
+					for(typename graph_traits < UndirectedGraph >::vertex_descriptor neileft: diffLeft){
+						int memberName = get(name_map, neileft);
+						if(wreachSets_copy[memberName].size()  - 1 != getDifferenceOfVecs(wreachSets_copy[memberName], {orderD_copy[right]}).size()){
+							printVec(g, wreachSets_copy[memberName], neileft, name_map, "wreach set ");
+							printVec(g, getDifferenceOfVecs(wreachSets_copy[memberName], {orderD_copy[right]}), orderD_copy[right], name_map, "diff set after removing");
+							printVec(g, clusterNewLeft, orderD_copy[right], name_map, "wrong cluster");
+							cout << "wiom: " << where_in_order_copy[memberName] << ", " << right+1 << endl;
+							df++;
+
+						}
 						wreachSets_copy[memberName] = getDifferenceOfVecs(wreachSets_copy[memberName], {orderD_copy[right]});
 						wreach_szs_copy[memberName]--;
 						// update the weakly reachable set for the vertex that was moved to the right
-						wreachSets_copy[order_copy[right]].PB(u);
+						wreachSets_copy[order_copy[right]].PB(neileft);
 
 					}
 					// update the weakly reachable sets for the vertices in diffRight
 					// they gain the vertex moved to the left
-					for(typename graph_traits < UndirectedGraph >::vertex_descriptor u: diffRight){
-						int memberName = get(name_map, u);
-						wreachSets_copy[memberName] = getUnionOfVecs(wreachSets_copy[memberName], {orderD_copy[left]});
-						wreach_szs_copy[memberName]++;
-						wreach_szs_copy[order_copy[left]]--;
+					for(typename graph_traits < UndirectedGraph >::vertex_descriptor neiright: diffRight){
+						int memberName = get(name_map, neiright);
+						if(memberName != order_copy[right]){
+							if(wreachSets_copy[memberName].size()  + 1 != getUnionOfVecs(wreachSets_copy[memberName], {orderD_copy[left]}).size()){
+								cout << "t, il, swap: " << t << ", " << il << ", " << swapI << endl;
+								printVec(g, wreachSets_copy[memberName], neiright, name_map, "wreach set ");
+								printVec(g, getUnionOfVecs(wreachSets_copy[memberName], {orderD_copy[left]}), orderD_copy[left], name_map, "union set after adding");
+								printVec(g, clusterNewRight, orderD_copy[left], name_map, "wrong cluster");
+								cout << "wiom: " << where_in_order_copy[memberName] << ", " << left+1 << endl;
+								df++;
+
+							}
+							wreachSets_copy[memberName] = getUnionOfVecs(wreachSets_copy[memberName], {orderD_copy[left]});
+							wreach_szs_copy[memberName]++;
+							wreach_szs_copy[order_copy[left]]--;
+						}
 					}
 					// update the weakly reachable set for the vertex that was moved to the left
 					wreachSets_copy[order_copy[left]] = getDifferenceOfVecs(wreachSets_copy[order_copy[left]], diffRight);
 				}
-				//vector<int> wreach_szs2 = ComputeWreachSzs(g, where_in_order_copy, R, name_map);
+
 				int wcolNew = ComputeWcol(wreach_szs_copy);
-				//int wcolNew_test = ComputeWcol(wreach_szs2);
 
 				wcolInc = wcolNew >= wcol;
-				float prob = getProb(t,wcol, wcolNew, n /*rightAvg, leftAvg, il*/);
+				float prob = getProb(t,wcol, wcolNew, n);
 
 				if(!wcolInc || prob >= rdVal){
 					// found better solution or accepting worse one
 					// update wcol and data structures
 					wcol = wcolNew;
-					//wcol_test = wcolNew_test;
 					where_in_order = where_in_order_copy, wreach_szs = wreach_szs_copy, wreachSets = wreachSets_copy;
 					orderD = orderD_copy, order = order_copy;
 					if(wcolInc && prob >= rdVal){
@@ -761,22 +827,24 @@ int main(int argc, char** argv) {
 			// since we've been stuck in a local minimum we need to "heat up" again
 			// we leave the loop at the current low temperature and do another round of annealing
 			if(ilLast + 1 >= t){
-				cout << "heat up -- compCt: " << compCt << ", wcol: " << wcol /*<< ", wcolTest: " << wcol_test*/ << endl;
+				cout << "heat up -- compCt: " << compCt << ", wcol: " << wcol << endl;
 				trace << "###heat up" << endl;
-				schedule_Start += (t - schedule_Start)*0.25;
+				schedule_Start += (t - schedule_Start)*0.15;
 				break; // schedule loop
 			}
 			tLast = t;
 		} // end schedule loop
-		if(schedule_Start == 1){
-			break;
-		}
 		compCt += tLast;
 	} // end computation loop
 	trace.close();
 
 	cout << "wcol final: "<< wcol << endl;
-
+	vector<int> ws = ComputeWreachSzs(g, where_in_order, R, name_map);
+	//assert(wcol == ComputeWcol(ComputeAllWReach(g, name_map, where_in_order, R, is_forb_dummy, dVdummy)));
+	cout << "check: wcol = "<< ComputeWcol(ws) << endl;
+	for(int j=0; j < order.size(); j++){
+		assert(order[j] = orderD[j] + 1);
+	}
 	ofstream out;
 	InitOfstream(out, output_file);
 	cout << "Order final" <<endl;
