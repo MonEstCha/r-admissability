@@ -8,10 +8,10 @@ The r-admissability of a graph adm<sub>r</sub>(G) is an ordering of the graph’
 # The Algorithm
 The algorithm builds the order from right to left always putting a vertex with an r-admissable set of minimum size. The number of paths starting at a vertex v is determined by Depth-First-Search (DFS) in a greedy manner, i.e. always choosing a path where the first inner vertex (a vertex greater than v in the ordering) comes first in the neighbor-list of v and is not part of a path yet.
 
-# COMPLEXITY
+# Complexity
 Let n be the number of vertices in the graph and m be the number of its edges.
 The complexity of the algorithm is O(n<sup>3</sup>m), since it takes O(n) steps to build the order, where each of them consists of comparing the r-admissable sets of O(n) vertices. The calculation of each set takes O(nm) steps since DFS is performed at most m times.
 
-# INPUT AND PREREQUISITES
+# Input and Prerequisites
 The algorithm makes use of the Boost library as well as c++14 features.
 The input is expected to be either of file format „csv“ or „txtg“ and an edge list where one edge spans a line and the endpoints are separated by a tab. 
